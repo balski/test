@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Real TIme Chat Application - By Muhammad Iqbal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <h2>Real-Time Chat 💬</h2>
+
+    <div class="chat-box">
+      <transition-group name="fade" tag="div">
+        <div v-for="(msg, index) in messages" :key="index" :class="{'me': msg.self, 'msg': true}">
+          <b>{{ msg.self ? 'You' : 'Other' }}:</b> {{ msg.text }}
+        </div>
+      </transition-group>
+    </div>
+
+    <input type="text" v-model="input" @keyup.enter="sendMessage" placeholder="Type a message..." />
+    <button @click="sendMessage">Send</button>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          ws: null,
+          messages: [],
+          input: '',
+          id: Date.now().toString()
+        };
+      },
+      methods: {
+        sendMessage() {
+          if (this.input.trim() === '') return;
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            const msg = { text: this.input, sender: this.id };
+            this.ws.send(JSON.stringify(msg));
+            this.input = '';
+          } else {
+            alert("WebSocket is not connected");
+          }
+        }
+      },
+      mounted() {
+        this.ws = new WebSocket("ws://localhost:8080");
+
+        this.ws.onopen = () => {
+          console.log("✅ WebSocket connected");
+        };
+
+        this.ws.onerror = (err) => {
+          console.error("❌ WebSocket error:", err);
+        };
+
+        this.ws.onclose = () => {
+          console.warn("⚠️ WebSocket closed");
+        };
+
+        this.ws.onmessage = async (event) => {
+          try {
+            const text = await event.data.text(); // Blob-safe
+            const msg = JSON.parse(text);
+            this.messages.push({
+              text: msg.text,
+              self: msg.sender === this.id
+            });
+
+            this.$nextTick(() => {
+              const box = document.querySelector('.chat-box');
+              box.scrollTop = box.scrollHeight;
+            });
+          } catch (err) {
+            console.error("Parse error:", err);
+          }
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
